@@ -6,11 +6,11 @@ but for now, sighax enable us to get the decryption of title.db the the titles i
 1. review the ARM assembly learned in collage
 2. review the Cryptography learner in collage
 3. read the doc on [3dbrew](https://www.3dbrew.org)
-4. learn from the 3ds hacking community (but where? not found now)
+4. learn from the 3ds hacking community (like [ihaveamac](https://github.com/ihaveamac/3DS-rom-tools))
 
 ## features
 1. convert 3ds to cia
 2. install cia to SD/TF
-    1. locate the EmuNAND, decrypt the title.db
+    1. locate the EmuNAND, [decrypt](https://github.com/letsdecrypt/fuse-3ds) the title.db
     2. write title info to EmuNAND
     3. write decrypted cia to TF
