@@ -1,0 +1,6 @@
+[package]
+name = "yoshi"
+version = "0.1.0"
+authors = ["Jonir Rings <peterpuyi@live.cn>"]
+
+[dependencies]
