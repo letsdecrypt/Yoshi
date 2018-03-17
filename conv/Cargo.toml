@@ -1,0 +1,14 @@
+[package]
+name = "conv"
+version = "0.1.0"
+authors = ["Jonir Rings <peterpuyi@live.cn>"]
+
+[dependencies]
+
+[lib]
+name = "conv_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "conv_bin"
+path = "src/bin.rs"
