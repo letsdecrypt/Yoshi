@@ -1,3 +1,6 @@
+pub mod util;
+pub mod get_bins;
+
 #[cfg(test)]
 mod tests {
     #[test]
