@@ -1,3 +1,6 @@
+#![feature(i128_type)]
+#![feature(u128_type)]
+
 pub mod util;
 pub mod get_bins;
 

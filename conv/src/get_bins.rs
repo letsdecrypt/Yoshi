@@ -28,7 +28,7 @@ pub fn get_boot9() -> Option<&'static str> {
                 if f.seek(SeekFrom::Start(0x59D0 + keys_offset)).is_err() {
                     panic!("seek error")
                 }
-                if f.read(&mut key).is_err() {
+                if f.read_exact(&mut key).is_err() {
                     panic!("read error")
                 }
                 if calc_md5(&key) == "e35bf88330f4f1b2bb6fd5b870a679ca" {
