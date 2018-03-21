@@ -12,13 +12,16 @@ use conv_lib::get_bins::get_boot9;
 use conv_lib::get_bins::get_cert_chain_retail;
 use conv_lib::get_bins::get_ticket_tmd;
 
+// todo: use buffer reader and writer instead of straight op
+
 // media unit
 const READ_SIZE: u32 = 0x800000;
 
 fn rotate_left_in_128(val: BigUint, r_bits: usize) -> BigUint {
     let max_bits = 128usize;
     let max = BigUint::from_bytes_le(&vec![0xffu8; 0x10]);
-    (val.clone() << r_bits % max_bits) & max.clone() | ((val.clone() & max.clone()) >> (max_bits - (r_bits % max_bits)))
+    (val.clone() << r_bits % max_bits) & max.clone()
+        | ((val.clone() & max.clone()) >> (max_bits - (r_bits % max_bits)))
 }
 
 pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
@@ -141,9 +144,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         if rom.seek(SeekFrom::Start(
             game_cxi_offset.to_u64().unwrap() + 0x100u64,
         )).is_err()
-            {
-                return;
-            }
+        {
+            return;
+        }
         let mut buff = vec![0u8; 0x4];
         if rom.read_exact(&mut buff).is_err() {
             return;
@@ -157,9 +160,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     {
         if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x18F))
             .is_err()
-            {
-                return;
-            }
+        {
+            return;
+        }
         let mut buff = vec![0u8; 0x1];
         if rom.read_exact(&mut buff).is_err() {
             return;
@@ -173,9 +176,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             } else {
                 if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
                     .is_err()
-                    {
-                        return;
-                    }
+                {
+                    return;
+                }
                 let mut buff = vec![0u8; 0x10];
                 // care big endian
                 if rom.read_exact(&mut buff).is_err() {
@@ -198,7 +201,11 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     }
     // let's converting
     {
-        println!("Converting {} ({})...", stem, if encrypted { "encrypted" } else { "decrypted" });
+        println!(
+            "Converting {} ({})...",
+            stem,
+            if encrypted { "encrypted" } else { "decrypted" }
+        );
     }
     // Game Executable fist-half ExtHeader
     {}
