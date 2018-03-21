@@ -2,10 +2,13 @@
 name = "conv"
 version = "0.1.0"
 authors = ["Jonir Rings <peterpuyi@live.cn>"]
+description = "Convert Nintendo 3DS CCI (.3ds/.cci) to CIA"
+
 
 [dependencies]
-shellexpand = "1.0"
-rust-crypto = "0.2.36"
+shellexpand = "^1.0"
+rust-crypto = "^0.2"
+clap = {version = "^2.31", features = [ "suggestions", "color" ]}
 
 [lib]
 name = "conv_lib"

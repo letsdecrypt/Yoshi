@@ -1,12 +1,12 @@
-extern crate shellexpand;
 extern crate crypto;
+extern crate shellexpand;
 
 use self::crypto::md5::Md5;
 use self::crypto::digest::Digest;
 use std::mem;
 use std::path::Path;
 use std::fs::File;
-use std::io::{SeekFrom, Seek, Read};
+use std::io::{Read, Seek, SeekFrom};
 use std::fs::metadata;
 
 const MU: u32 = 0x200;
@@ -16,7 +16,8 @@ const READ_SIZE: u32 = 0x800000;
 const ZERO_KEY: [u8; 0x10] = [0; 0x10];
 
 fn bytes_to_hex_string(bytes: Vec<u8>) -> String {
-    bytes.iter()
+    bytes
+        .iter()
         .map(|b| format!("{:02X}", b))
         .collect::<String>()
 }
@@ -128,7 +129,9 @@ pub fn convert(path: &str) {
     debug_assert_eq!(dlpchild_cfa_size, 0x0);
     // check for NCCH magic
     // prevents NAND dumps from being "converted"
-    if rom.seek(SeekFrom::Start((game_cxi_offset + 0x100) as u64)).is_err() {
+    if rom.seek(SeekFrom::Start((game_cxi_offset + 0x100) as u64))
+        .is_err()
+    {
         panic!("seek NCCH magic error")
     }
     let mut ncsd_magic: [u8; 0x4] = [0; 0x4];
@@ -139,7 +142,9 @@ pub fn convert(path: &str) {
         panic!("\"{}\" is not a CCI file (missing NCCH magic).", real_path);
     }
     // get the encryption type
-    if rom.seek(SeekFrom::Start((game_cxi_offset + 0x18F) as u64)).is_err() {
+    if rom.seek(SeekFrom::Start((game_cxi_offset + 0x18F) as u64))
+        .is_err()
+    {
         panic!("seek encryption type error")
     }
     let mut encryption_buf: [u8; 0x1] = [0u8; 0x1];
@@ -186,7 +191,7 @@ pub fn convert(path: &str) {
 mod tests {
     use super::*;
     use std::fs::{metadata, File};
-    use std::io::{SeekFrom, Seek, Read};
+    use std::io::{Read, Seek, SeekFrom};
 
     #[test]
     fn check_is_file() {

@@ -3,14 +3,14 @@ extern crate shellexpand;
 use util::{is_valid_file, calc_md5};
 use std::path::Path;
 use std::fs::{metadata, File};
-use std::io::{SeekFrom, Seek, Read};
+use std::io::{Read, Seek, SeekFrom};
 
 pub fn get_boot9() -> Option<&'static str> {
     let paths = [
         "boot9.bin",
         "boot9_prot.bin",
         "~/.3ds/boot9.bin",
-        "~/.3ds/boot9_prot.bin"
+        "~/.3ds/boot9_prot.bin",
     ];
     for path in paths.iter() {
         match is_valid_file(path) {
@@ -44,10 +44,7 @@ pub fn get_boot9() -> Option<&'static str> {
 }
 
 pub fn cert_chain_retail() -> Option<&'static str> {
-    let paths = [
-        "cert_chain_retail.bin",
-        "~/.3ds/cert_chain_retail.bin",
-    ];
+    let paths = ["cert_chain_retail.bin", "~/.3ds/cert_chain_retail.bin"];
     for path in paths.iter() {
         match is_valid_file(path) {
             false => println!("... {}: File doesn\'t exist.", path),
@@ -62,10 +59,7 @@ pub fn cert_chain_retail() -> Option<&'static str> {
 }
 
 pub fn ticket_tmd() -> Option<&'static str> {
-    let paths = [
-        "ticket_tmd.bin",
-        "~/.3ds/ticket_tmd.bin",
-    ];
+    let paths = ["ticket_tmd.bin", "~/.3ds/ticket_tmd.bin"];
 
     for path in paths.iter() {
         match is_valid_file(path) {
