@@ -1,6 +1,14 @@
 #[macro_use]
-
 extern crate clap;
+#[macro_use]
+extern crate log;
+extern crate conv_lib;
+extern crate shellexpand;
+
+mod conv;
+
+use conv::conv;
+use std::path::Path;
 use clap::{App, AppSettings, Arg};
 
 fn main() {
@@ -41,9 +49,24 @@ fn main() {
         println!("verbose: {}", verbose);
         println!("overwrite: {}", overwrite);
         println!("output: {}", output);
-        let files: Vec<_> = m.values_of("files").unwrap().collect();
-        for file in files {
-            println!("{}", file);
+        let output_path = shellexpand::full(output).unwrap().into_owned();
+        {
+            let files: Vec<_> = m.values_of("files").unwrap().collect();
+            for file in files {
+                let real_path = shellexpand::full(file).unwrap().into_owned();
+                {
+                    println!("Processing {}", real_path);
+                    let full_path = Path::new(&real_path);
+                    if full_path.is_file() {
+                        if let Some(stem) = full_path.file_stem() {
+                            conv(full_path, stem.to_str().unwrap(), &output_path, verbose);
+                        }
+                    } else {
+                        println!("{} is not a valid file", file);
+                    }
+                    continue;
+                }
+            }
         }
     }
 }

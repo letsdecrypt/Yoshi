@@ -7,13 +7,8 @@ use std::mem;
 use std::path::Path;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::fs::metadata;
 
-const MU: u32 = 0x200;
-// media unit
-const READ_SIZE: u32 = 0x800000;
-// used from padxorer
-const ZERO_KEY: [u8; 0x10] = [0; 0x10];
+// todo: use buffer reader and writer instead of straight op
 
 fn bytes_to_hex_string(bytes: Vec<u8>) -> String {
     bytes
@@ -33,7 +28,7 @@ pub fn calc_md5(key: &[u8]) -> String {
     hasher.result_str()
 }
 
-pub fn convert(path: &str) {
+/*fn convert(path: &str) {
     let ref real_path = shellexpand::tilde(path).into_owned();
     println!("----------\nProcessing {}...", real_path);
     let mut rom = File::open(real_path).unwrap();
@@ -185,7 +180,7 @@ pub fn convert(path: &str) {
     /// 3. p2 + 0x1FF9E9AAC5FE0408024591DC5D52768A, as p3
     /// 4. p3 rotate left 87, as final key
     println!("{}", bytes_to_hex_string(key.to_vec()));
-}
+}*/
 
 #[cfg(test)]
 mod tests {
