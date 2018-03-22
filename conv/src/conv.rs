@@ -29,7 +29,6 @@ fn rotate_left_in_128(val: BigUint, r_bits: usize) -> BigUint {
 
 pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     let mut rom = File::open(full_path).unwrap();
-    let mut cia = File::create(format!("{}/{}.cia", output_path, stem)).unwrap();
 
     let mut encrypted = false;
     let mut key = BigUint::from_bytes_le(&vec![0u8; 0x10]);
@@ -46,11 +45,11 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     let content_index: u8;
     let content_count: u8;
     let title_id: BigUint;
-    let save_size: [u8; 0x4];
-    let mut ncch_header = [0u8; 0x200];
-    let mut extheader = [0u8; 0x400];
-    let exefs_icon: [u8; 0x36C0];
-    let dependency_list: [u8; 0x180];
+    let mut save_size = vec![0u8; 0x4];
+    let mut ncch_header = vec![0u8; 0x200];
+    let mut extheader = vec![0u8; 0x400];
+    let exefs_icon = vec![0u8; 0x36C0];
+    let mut dependency_list = vec![0u8; 0x180];
 
     let mut boot9_key = vec![0u8; 0x10];
     let mut cert_buff = Vec::<u8>::new();
@@ -147,9 +146,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         if rom.seek(SeekFrom::Start(
             game_cxi_offset.to_u64().unwrap() + 0x100u64,
         )).is_err()
-            {
-                return;
-            }
+        {
+            return;
+        }
         let mut buff = vec![0u8; 0x4];
         if rom.read_exact(&mut buff).is_err() {
             return;
@@ -163,9 +162,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     {
         if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x18F))
             .is_err()
-            {
-                return;
-            }
+        {
+            return;
+        }
         let mut buff = vec![0u8; 0x1];
         if rom.read_exact(&mut buff).is_err() {
             return;
@@ -179,9 +178,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             } else {
                 if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
                     .is_err()
-                    {
-                        return;
-                    }
+                {
+                    return;
+                }
                 let mut buff = vec![0u8; 0x10];
                 // care big endian
                 if rom.read_exact(&mut buff).is_err() {
@@ -216,9 +215,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         println!("\nVerifying ExtHeader...");
         if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x200))
             .is_err()
-            {
-                return;
-            }
+        {
+            return;
+        }
 
         let mut buff = vec![0u8; 0x400];
         if rom.read_exact(&mut buff).is_err() {
@@ -274,13 +273,13 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     {
         extheader[0xD] |= 2;
         let mut sha = Sha256::new();
-        let new_extheader_hash = vec![0u8; 0x20];
+        let mut new_extheader_hash = vec![0u8; 0x20];
         sha.input(&extheader);
-        sha.result(&new_extheader_hash);
+        sha.result(&mut new_extheader_hash);
         // get dependency list for meta region
-        dependency_list = extheader[0x40..0x1C0];
+        dependency_list = extheader[0x40..0x1C0].to_vec();
         // get save data size for tmd
-        save_size = extheader[0x1C0..0x1C4];
+        save_size = extheader[0x1C0..0x1C4].to_vec();
         if encrypted {
             println!("Re-encrypting ExtHeader...");
             let mut enc_out_buff = vec![0u8; 0x400];
@@ -306,22 +305,29 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         }
         // Game Executable NCCH Header
         println!("\nReading NCCH Header of Game Executable...");
-        if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64())).is_err() {
+        if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap())).is_err() {
             return;
         }
-        if rom.read_exact(&mut ncch_header).is_err(){
+        if rom.read_exact(&mut ncch_header).is_err() {
             return;
         }
-        ncch_header.splice(0x160..0x180, new_extheader_hash.iter().cloned())
+        ncch_header.splice(0x160..0x180, new_extheader_hash.iter().cloned());
     }
     // get icon from ExeFS
     {
         println!("Getting SMDH...");
-        let exefs_offset = BigUint::from_bytes_le(ncch_header[0x1A0..0x1A4]) * mu.clone();
-        if rom.seek(SeekFrom::Start((game_cxi_offset.clone() + exefs_offset.clone()).to_u64())).is_err(){
+        let exefs_offset = BigUint::from_bytes_le(&ncch_header[0x1A0..0x1A4]) * mu.clone();
+        if rom.seek(SeekFrom::Start(
+            (game_cxi_offset + exefs_offset).to_u64().unwrap(),
+        )).is_err()
+        {
             return;
         }
-        let mut exefs_file_header= vec![0u8;0x40];
+        let mut exefs_file_header = vec![0u8; 0x40];
         rom.read_exact(&mut exefs_file_header);
+    }
+    // cia writing
+    {
+        let mut cia = File::create(format!("{}/{}.cia", output_path, stem)).unwrap();
     }
 }
