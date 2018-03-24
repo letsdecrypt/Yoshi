@@ -10,6 +10,8 @@ shellexpand = "^1.0"
 rust-crypto = "^0.2"
 num-traits = "^0.2"
 num-bigint = "^0.1"
+byteorder = "^1.0"
+indicatif = "^0.9"
 log = "^0.4"
 clap = {version = "^2.31", features = [ "suggestions", "color" ]}
 

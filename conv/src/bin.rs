@@ -4,12 +4,13 @@ extern crate clap;
 extern crate log;
 extern crate conv_lib;
 extern crate shellexpand;
+extern crate core;
 
 mod conv;
 
+use clap::{App, AppSettings, Arg};
 use conv::conv;
 use std::path::Path;
-use clap::{App, AppSettings, Arg};
 
 fn main() {
     let app = App::new(crate_name!())

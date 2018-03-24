@@ -1,12 +1,12 @@
 extern crate crypto;
 extern crate shellexpand;
 
-use self::crypto::md5::Md5;
 use self::crypto::digest::Digest;
-use std::mem;
-use std::path::Path;
+use self::crypto::md5::Md5;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::mem;
+use std::path::Path;
 
 pub fn is_valid_file(path: &str) -> bool {
     let ref real_path = shellexpand::tilde(path).into_owned();
