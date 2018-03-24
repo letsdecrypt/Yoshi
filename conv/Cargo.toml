@@ -11,7 +11,6 @@ rust-crypto = "^0.2"
 num-traits = "^0.2"
 num-bigint = "^0.1"
 byteorder = "^1.0"
-indicatif = "^0.9"
 rayon = "^1.0"
 clap = {version = "^2.31", features = [ "suggestions", "color" ]}
 
@@ -20,5 +19,5 @@ name = "conv_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "conv_bin"
+name = "conv"
 path = "src/bin.rs"

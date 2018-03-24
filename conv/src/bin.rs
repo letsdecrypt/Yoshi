@@ -4,8 +4,8 @@ extern crate conv_lib;
 extern crate shellexpand;
 
 use clap::{App, AppSettings, Arg};
-use std::path::Path;
 use conv_lib::conv::conv;
+use std::path::Path;
 
 fn main() {
     let app = App::new(crate_name!())

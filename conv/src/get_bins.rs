@@ -1,8 +1,8 @@
 use shellexpand;
 
-use util::{is_valid_file, calc_md5};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use util::{is_valid_file, calc_md5};
 
 pub fn get_boot9() -> Option<String> {
     let paths = [
