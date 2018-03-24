@@ -19,7 +19,6 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write, BufReader, BufWriter};
 use std::iter::repeat;
 use std::path::Path;
-use std::mem;
 
 const READ_SIZE: usize = 0x800000;
 
@@ -34,7 +33,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     let rom_file = File::open(full_path).unwrap();
     let mut rom = BufReader::with_capacity(READ_SIZE * 0x10, rom_file);
 
-    let mut encrypted = false;
+    let mut encrypted: bool;
     let mut key = BigUint::from_bytes_le(&vec![0u8; 0x10]);
 
     let mu: BigUint = BigUint::from(0x200u64);
@@ -191,12 +190,12 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                     return;
                 }
                 let key_y = BigUint::from_bytes_be(&buff);
-                println!("key_y: {:016X}", key_y);
+                // println!("key_y: {:016X}", key_y);
                 let orig_ncch_key = BigUint::from_bytes_be(&boot9_key);
-                println!("orig_ncch_key: {:016X}", orig_ncch_key);
+                // println!("orig_ncch_key: {:016X}", orig_ncch_key);
                 let addition =
                     BigUint::parse_bytes(b"1FF9E9AAC5FE0408024591DC5D52768A", 16).unwrap();
-                println!("addition: {}", addition);
+                // println!("addition: {}", addition);
                 let p1 = rotate_left_in_128(orig_ncch_key, 2);
                 let p2 = p1 ^ key_y;
                 let p3 = p2 + addition;
@@ -231,7 +230,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             println!("Decrypting ExtHeader...");
             let mut dec_out_buff = vec![0u8; 0x400];
             let mut extheader_ctr_iv_str = title_id.to_str_radix(0x10);
-            let mut ap = "0100000000000000";
+            let ap = "0100000000000000";
             extheader_ctr_iv_str.push_str(ap);
             let extheader_ctr_iv = BigUint::from_str_radix(&extheader_ctr_iv_str, 0x10).unwrap();
             let mut k = key.clone().to_bytes_le();
@@ -288,7 +287,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             println!("Re-encrypting ExtHeader...");
             let mut enc_out_buff = vec![0u8; 0x400];
             let mut extheader_ctr_iv_str = title_id.to_str_radix(0x10);
-            let mut ap = "0100000000000000";
+            let ap = "0100000000000000";
             extheader_ctr_iv_str.push_str(ap);
             let extheader_ctr_iv = BigUint::from_str_radix(&extheader_ctr_iv_str, 0x10).unwrap();
             let mut k = key.clone().to_bytes_le();
@@ -335,7 +334,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             println!("Decrypting ExeFS Header...");
             let mut dec_buff = vec![0u8; 0x40];
             let mut exefs_ctr_iv_str = title_id.to_str_radix(0x10);
-            let mut ap = "0200000000000000";
+            let ap = "0200000000000000";
             exefs_ctr_iv_str.push_str(ap);
             let exefs_ctr_iv = BigUint::from_str_radix(&exefs_ctr_iv_str, 0x10).unwrap();
             let mut k = key.clone().to_bytes_le();
@@ -373,7 +372,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 if encrypted {
                     let mut dec_buff = vec![0u8; 0x36C0];
                     let mut exefs_ctr_iv_str = title_id.to_str_radix(0x10);
-                    let mut ap = "0200000000000000";
+                    let ap = "0200000000000000";
                     exefs_ctr_iv_str.push_str(ap);
                     let exefs_ctr_iv = BigUint::from_str_radix(&exefs_ctr_iv_str, 0x10).unwrap();
                     let exefs_icon_iv =
@@ -447,7 +446,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 chunk_records.write_u32::<BigEndian>(0);
             }
         }
-        let content_size = game_cxi_size.clone() + manual_cfa_size + dlpchild_cfa_size;
+        let content_size = game_cxi_size.clone() + manual_cfa_size.clone() + dlpchild_cfa_size.clone();
 
         let mut initial_cia_header = vec![];
 
@@ -523,10 +522,107 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                     left -= READ_SIZE as isize;
                     bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
                 }
-                bar.finish();
+                bar.finish_and_clear();
             }
             sha.result(&mut game_cxi_hash);
-            println!("game_cxi_hash: {:016X}", BigUint::from_bytes_be(&game_cxi_hash));
+            println!("Game Executable CXI SHA-256 hash: {:016X}", BigUint::from_bytes_be(&game_cxi_hash));
+            cia.seek(SeekFrom::Start(0x38D4));
+            cia.write(&game_cxi_hash);
+            chunk_records.splice(0x10..0x30, game_cxi_hash.iter().cloned());
+        }
+        {
+            let mut cr_offset = 0usize;
+            //  Manual CFA
+            if manual_cfa_offset.to_u64().unwrap() != 0 {
+                cia.seek(SeekFrom::End(0));
+                let mut hash_buff = vec![0u8; 0x20];
+                let mut sha = Sha256::new();
+                {
+                    println!("Writing Manual CFA...");
+                    rom.seek(SeekFrom::Start(manual_cfa_offset.to_u64().unwrap()));
+                    let mut left = manual_cfa_size.to_isize().unwrap();
+                    let bar = ProgressBar::new(left as u64);
+                    let mut buff = vec![0u8; READ_SIZE];
+                    while left > 0 {
+                        if left < READ_SIZE as isize {
+                            buff = vec![0u8; left as usize];
+                        }
+                        rom.read_exact(&mut buff);
+                        cia.write(&buff);
+                        sha.input(&buff);
+                        left -= READ_SIZE as isize;
+                        bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
+                    }
+                    bar.finish_and_clear();
+                }
+                sha.result(&mut hash_buff);
+                println!("Manual CFA SHA-256 hash: {:016X}", BigUint::from_bytes_be(&hash_buff));
+                cia.seek(SeekFrom::Start(0x3904));
+                cia.write(&hash_buff);
+                chunk_records.splice(0x40..0x60, hash_buff.iter().cloned());
+                cr_offset += 0x30;
+            }
+            // Download Play child container CFA
+            if dlpchild_cfa_offset.to_u64().unwrap() != 0 {
+                cia.seek(SeekFrom::End(0));
+                let mut hash_buff = vec![0u8; 0x20];
+                let mut sha = Sha256::new();
+                {
+                    println!("Writing Download Play child container CFA...");
+                    rom.seek(SeekFrom::Start(dlpchild_cfa_offset.to_u64().unwrap()));
+                    let mut left = manual_cfa_size.to_isize().unwrap();
+                    let bar = ProgressBar::new(left as u64);
+                    let mut buff = vec![0u8; READ_SIZE];
+                    while left > 0 {
+                        if left < READ_SIZE as isize {
+                            buff = vec![0u8; left as usize];
+                        }
+                        rom.read_exact(&mut buff);
+                        cia.write(&buff);
+                        sha.input(&buff);
+                        left -= READ_SIZE as isize;
+                        bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
+                    }
+                    bar.finish_and_clear();
+                }
+                sha.result(&mut hash_buff);
+                println!("Download Play child container CFA SHA-256 hash: {:016X}", BigUint::from_bytes_be(&hash_buff));
+                cia.seek(SeekFrom::Start((0x3904 + cr_offset) as u64));
+                cia.write(&hash_buff);
+                chunk_records.splice((0x40 + cr_offset)..(0x60 + cr_offset), hash_buff.iter().cloned());
+            }
+        }
+        // update final hashes
+        {
+            println!("\nUpdating hashes...");
+            let mut chunk_records_hash = vec![0u8; 0x20];
+            let mut sha = Sha256::new();
+            sha.input(&chunk_records);
+            sha.result(&mut chunk_records_hash);
+            println!("Content chunk records SHA-256 hash: {:016X}", BigUint::from_bytes_be(&chunk_records_hash));
+            cia.seek(SeekFrom::Start(0x2FC7));
+            cia.write(&[content_count]);
+            cia.write(&chunk_records_hash);
+            cia.seek(SeekFrom::Start(0x2FA4));
+            let mut info_records_hash = vec![0u8; 0x20];
+            let mut info_records_sha = Sha256::new();
+            info_records_sha.input(&[0, 0, 0, content_count]);
+            info_records_sha.input(&chunk_records_hash);
+            info_records_sha.input(&vec![0u8; 0x8DC]);
+            info_records_sha.result(&mut info_records_hash);
+            println!("Content info records SHA-256 hash: {:016X}", BigUint::from_bytes_be(&info_records_hash));
+            cia.write(&info_records_hash);
+        }
+        // write Meta region
+        {
+            cia.seek(SeekFrom::End(0));
+            cia.write(&dependency_list);
+            cia.write(&vec![0u8; 0x180]);
+            let mut end_mark = vec![];
+            end_mark.write_u32::<LittleEndian>(0x2);
+            cia.write(&end_mark);
+            cia.write(&vec![0u8; 0xFC]);
+            cia.write(&exefs_icon);
         }
     }
 }
