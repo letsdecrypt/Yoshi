@@ -2,7 +2,6 @@
 extern crate clap;
 extern crate conv_lib;
 extern crate shellexpand;
-extern crate core;
 
 use clap::{App, AppSettings, Arg};
 use std::path::Path;
