@@ -24,11 +24,11 @@ fn rotate_left_in_128(val: BigUint, r_bits: usize) -> BigUint {
         | ((val.clone() & max.clone()) >> (max_bits - (r_bits % max_bits)))
 }
 
-pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
+pub fn conv(full_path: &Path, stem: &str, output_path: &str, _verbose: bool) {
     let rom_file = File::open(full_path).unwrap();
     let mut rom = BufReader::with_capacity(READ_SIZE * 0x10, rom_file);
 
-    let mut encrypted: bool;
+    let encrypted: bool;
     let mut key = BigUint::from_bytes_le(&vec![0u8; 0x10]);
 
     let mu: BigUint = BigUint::from(0x200u64);
@@ -43,11 +43,11 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     let mut content_index = 0b10000000u8;
     let mut content_count = 1u8;
     let title_id: BigUint;
-    let mut save_size = vec![0u8; 0x4];
+    let save_size: Vec<u8>;
     let mut ncch_header = vec![0u8; 0x200];
-    let mut extheader = vec![0u8; 0x400];
+    let mut extheader: Vec<u8>;
     let mut exefs_icon = vec![0u8; 0x36C0];
-    let mut dependency_list = vec![0u8; 0x180];
+    let dependency_list: Vec<u8>;
 
     let mut boot9_key = vec![0u8; 0x10];
     let mut cert_buff = Vec::<u8>::new();
@@ -57,99 +57,62 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         let mut ticket_tmd = File::open(get_ticket_tmd().unwrap()).unwrap();
         let mut boot9 = File::open(get_boot9().unwrap()).unwrap();
 
-        if cert_chain_retail.read_to_end(&mut cert_buff).is_err() {
-            return;
-        }
-        if ticket_tmd.read_to_end(&mut ticket_buff).is_err() {
-            return;
-        }
+        cert_chain_retail.read_to_end(&mut cert_buff).expect("failed to read cert_chain_retail");
+        ticket_tmd.read_to_end(&mut ticket_buff).expect("failed to read ticket_tmd");
         {
             let mut keys_offset = 0;
             if boot9.metadata().unwrap().len() == 0x10000 {
                 keys_offset += 0x8000;
             }
-            if boot9.seek(SeekFrom::Start(0x59D0 + keys_offset)).is_err() {
-                return;
-            }
-            // care big endian
-            if boot9.read_exact(&mut boot9_key).is_err() {
-                println!("boot9 read failed");
-                return;
-            }
+            boot9.seek(SeekFrom::Start(0x59D0 + keys_offset)).expect("failed to seek in boot9");
+            // big endian
+            boot9.read_exact(&mut boot9_key).expect("failed to read boot9");
         }
     }
     // check for NCSD magic
     {
-        if rom.seek(SeekFrom::Start(0x100)).is_err() {
-            return;
-        }
+        rom.seek(SeekFrom::Start(0x100)).expect("failed to seek for NCSD in rom");
         let mut buff = vec![0u8; 0x4];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read NCSD in rom");
         if &buff != b"NCSD" {
             println!("{} is not a CCI file (missing NCSD magic)", stem);
             return;
         }
     }
     {
-        if rom.seek(SeekFrom::Start(0x108)).is_err() {
-            return;
-        }
+        rom.seek(SeekFrom::Start(0x108)).expect("failed to seek for title_id in rom");
         let mut buff = vec![0u8; 0x8];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read title_id in rom");
         title_id = BigUint::from_bytes_le(&buff);
         println!("\nTitle ID {:016X}", title_id);
     }
     // get partition sizes
     {
-        if rom.seek(SeekFrom::Start(0x120)).is_err() {
-            return;
-        }
+        rom.seek(SeekFrom::Start(0x120)).expect("failed to seek for partition sizes in rom");
         let mut buff = vec![0u8; 0x4];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read game_cxi_offset in rom");
         game_cxi_offset = BigUint::from_bytes_le(&buff) * mu.clone();
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read game_cxi_size in rom");
         game_cxi_size = BigUint::from_bytes_le(&buff) * mu.clone();
         println!("\nGame Executable CXI Size: {:X}", game_cxi_size);
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read manual_cfa_offset in rom");
         manual_cfa_offset = BigUint::from_bytes_le(&buff) * mu.clone();
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read manual_cfa_size in rom");
         manual_cfa_size = BigUint::from_bytes_le(&buff) * mu.clone();
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
         println!("Manual CFA Size: {:X}", manual_cfa_size);
+        rom.read_exact(&mut buff).expect("failed to read dlpchild_cfa_offset in rom");
         dlpchild_cfa_offset = BigUint::from_bytes_le(&buff) * mu.clone();
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read dlpchild_cfa_size in rom");
         dlpchild_cfa_size = BigUint::from_bytes_le(&buff) * mu.clone();
         println!("Download Play child CFA Size: {:X}\n", dlpchild_cfa_size);
     }
     // check for NCCH magic
     // prevents NAND dumps from being "converted"
     {
-        if rom.seek(SeekFrom::Start(
-            game_cxi_offset.to_u64().unwrap() + 0x100u64,
-        )).is_err()
-            {
-                return;
-            }
+        rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x100))
+            .expect("failed to seek for NCCH in rom");
         let mut buff = vec![0u8; 0x4];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read NCCH in rom");
         if &buff != b"NCCH" {
             println!("{} is not a CCI file (missing NCCH magic)", stem);
             return;
@@ -157,15 +120,10 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     }
     //  get the encryption type
     {
-        if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x18F))
-            .is_err()
-            {
-                return;
-            }
+        rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x18F))
+            .expect("failed to seek for encryption in rom");
         let mut buff = vec![0u8; 0x1];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read encryption in rom");
         let encryption = buff.first().unwrap();
         encrypted = encryption & 0x4 == 0;
         let zero_key = encryption & 0x1 != 0;
@@ -173,16 +131,11 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             key = if zero_key {
                 BigUint::from_bytes_le(&vec![0u8; 0x10])
             } else {
-                if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
-                    .is_err()
-                    {
-                        return;
-                    }
+                rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
+                    .expect("failed to seek for key_y in rom");
                 let mut buff = vec![0u8; 0x10];
-                // care big endian
-                if rom.read_exact(&mut buff).is_err() {
-                    return;
-                }
+                // big endian
+                rom.read_exact(&mut buff).expect("failed to read key_y in rom");
                 let key_y = BigUint::from_bytes_be(&buff);
                 // println!("key_y: {:016X}", key_y);
                 let orig_ncch_key = BigUint::from_bytes_be(&boot9_key);
@@ -210,16 +163,10 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     // Game Executable fist-half ExtHeader
     {
         println!("\nVerifying ExtHeader...");
-        if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x200))
-            .is_err()
-            {
-                return;
-            }
-
+        rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x200))
+            .expect("failed to seek for ExtHeader in rom");
         let mut buff = vec![0u8; 0x400];
-        if rom.read_exact(&mut buff).is_err() {
-            return;
-        }
+        rom.read_exact(&mut buff).expect("failed to read ExtHeader in rom");
         if encrypted {
             println!("Decrypting ExtHeader...");
             let mut dec_out_buff = vec![0u8; 0x400];
@@ -245,13 +192,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             sha.input(&dec_out_buff);
             let mut extheader_hash = vec![0u8; 0x20];
             sha.result(&mut extheader_hash);
-            if rom.seek(SeekFrom::Start(0x4160)).is_err() {
-                return;
-            }
+            rom.seek(SeekFrom::Start(0x4160)).expect("failed to seek for ncch_extheader_hash in rom");
             let mut ncch_extheader_hash = vec![0u8; 0x20];
-            if rom.read_exact(&mut ncch_extheader_hash).is_err() {
-                return;
-            }
+            rom.read_exact(&mut ncch_extheader_hash).expect("failed to read ncch_extheader_hash in rom");
             if ncch_extheader_hash != extheader_hash {
                 println!("This file may be corrupt (invalid ExtHeader hash).");
                 println!(
@@ -303,28 +246,20 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         }
         // Game Executable NCCH Header
         println!("\nReading NCCH Header of Game Executable...");
-        if rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
-            .is_err()
-            {
-                return;
-            }
-        if rom.read_exact(&mut ncch_header).is_err() {
-            return;
-        }
+        rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap()))
+            .expect("failed to seek for NCCH Header of Game Executable in rom");
+        rom.read_exact(&mut ncch_header)
+            .expect("failed to read NCCH Header of Game Executable in rom");
         ncch_header.splice(0x160..0x180, new_extheader_hash.iter().cloned());
     }
     // get icon from ExeFS
     {
         println!("Getting SMDH...");
         let exefs_offset = BigUint::from_bytes_le(&ncch_header[0x1A0..0x1A4]) * mu.clone();
-        if rom.seek(SeekFrom::Start(
-            (game_cxi_offset.clone() + exefs_offset).to_u64().unwrap(),
-        )).is_err()
-            {
-                return;
-            }
+        rom.seek(SeekFrom::Start((game_cxi_offset.clone() + exefs_offset).to_u64().unwrap()))
+            .expect("failed to seek for SMDH in rom");
         let mut exefs_file_header = vec![0u8; 0x40];
-        rom.read_exact(&mut exefs_file_header);
+        rom.read_exact(&mut exefs_file_header).expect("failed to read SMDH in rom");
         if encrypted {
             println!("Decrypting ExeFS Header...");
             let mut dec_buff = vec![0u8; 0x40];
@@ -362,8 +297,8 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                     BigUint::from_bytes_le(&exefs_file_header[offset_start..offset_end]);
                 rom.seek(SeekFrom::Current(
                     exefs_icon_offset.to_i64().unwrap() + 0x200 - 0x40,
-                ));
-                rom.read_exact(&mut exefs_icon);
+                )).expect("failed to seek for icon");
+                rom.read_exact(&mut exefs_icon).expect("failed to read icon");
                 if encrypted {
                     let mut dec_buff = vec![0u8; 0x36C0];
                     let mut exefs_ctr_iv_str = title_id.to_str_radix(0x10);
@@ -415,66 +350,65 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         let mut cia = BufWriter::with_capacity(READ_SIZE * 0x10, cia_file);
         let mut chunk_records = vec![];
 
-        chunk_records.write_u32::<BigEndian>(0u32);
-        chunk_records.write_u32::<BigEndian>(0);
-        chunk_records.write_u32::<BigEndian>(0);
-        chunk_records.write_u32::<BigEndian>(game_cxi_size.to_u32().unwrap());
+        chunk_records.write_u32::<BigEndian>(0u32).expect("failed to write chunk records");
+        chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
+        chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
+        chunk_records.write_u32::<BigEndian>(game_cxi_size.to_u32().unwrap()).expect("failed to write chunk records");
 
-        for i in 0..8 {
-            chunk_records.write_u32::<BigEndian>(0);
+        for _ in 0..8 {
+            chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
         }
         if manual_cfa_offset.to_u64().unwrap() != 0 {
-            chunk_records.write_u32::<BigEndian>(1u32);
-            chunk_records.write_u32::<BigEndian>(0x10000);
-            chunk_records.write_u32::<BigEndian>(0);
-            chunk_records.write_u32::<BigEndian>(manual_cfa_size.to_u32().unwrap());
-            for i in 0..8 {
-                chunk_records.write_u32::<BigEndian>(0);
+            chunk_records.write_u32::<BigEndian>(1u32).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(0x10000).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(manual_cfa_size.to_u32().unwrap()).expect("failed to write chunk records");
+            for _ in 0..8 {
+                chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
             }
         }
         if dlpchild_cfa_offset.to_u64().unwrap() != 0 {
-            chunk_records.write_u32::<BigEndian>(2u32);
-            chunk_records.write_u32::<BigEndian>(0x20000);
-            chunk_records.write_u32::<BigEndian>(0);
-            chunk_records.write_u32::<BigEndian>(dlpchild_cfa_size.to_u32().unwrap());
-            for i in 0..8 {
-                chunk_records.write_u32::<BigEndian>(0);
+            chunk_records.write_u32::<BigEndian>(2u32).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(0x20000).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
+            chunk_records.write_u32::<BigEndian>(dlpchild_cfa_size.to_u32().unwrap()).expect("failed to write chunk records");
+            for _ in 0..8 {
+                chunk_records.write_u32::<BigEndian>(0).expect("failed to write chunk records");
             }
         }
         let content_size = game_cxi_size.clone() + manual_cfa_size.clone() + dlpchild_cfa_size.clone();
 
         let mut initial_cia_header = vec![];
 
-        initial_cia_header.write_u32::<LittleEndian>(0x2020);
-        initial_cia_header.write_u16::<LittleEndian>(0);
-        initial_cia_header.write_u16::<LittleEndian>(0);
-        initial_cia_header.write_u32::<LittleEndian>(0xA00);
-        initial_cia_header.write_u32::<LittleEndian>(0x350);
+        initial_cia_header.write_u32::<LittleEndian>(0x2020).expect("failed to write initial cia head");
+        initial_cia_header.write_u16::<LittleEndian>(0).expect("failed to write initial cia head");
+        initial_cia_header.write_u16::<LittleEndian>(0).expect("failed to write initial cia head");
+        initial_cia_header.write_u32::<LittleEndian>(0xA00).expect("failed to write initial cia head");
+        initial_cia_header.write_u32::<LittleEndian>(0x350).expect("failed to write initial cia head");
 
-        initial_cia_header.write_u32::<LittleEndian>(tmd_size);
-        initial_cia_header.write_u32::<LittleEndian>(0x3AC0);
-        initial_cia_header.write_u32::<LittleEndian>(content_size.to_u32().unwrap());
-        initial_cia_header.write_u32::<LittleEndian>(0);
-        initial_cia_header.write_u8(content_index);
+        initial_cia_header.write_u32::<LittleEndian>(tmd_size).expect("failed to write cia header");
+        initial_cia_header.write_u32::<LittleEndian>(0x3AC0).expect("failed to write cia header");
+        initial_cia_header.write_u32::<LittleEndian>(content_size.to_u32().unwrap()).expect("failed to write cia header");
+        initial_cia_header.write_u32::<LittleEndian>(0).expect("failed to write cia header");
+        initial_cia_header.write_u8(content_index).expect("failed to write cia header");
 
         // initial CIA header
-        cia.write(&initial_cia_header);
+        cia.write(&initial_cia_header).expect("cia seek write failed");
         // padding
-        cia.write(&vec![0u8; 0x201F]);
+        cia.write(&vec![0u8; 0x201F]).expect("cia seek write failed");
         // cert chain
-        cia.write(&cert_buff);
+        cia.write(&cert_buff).expect("cia seek write failed");
         // ticket, tmd
-        cia.write(&ticket_buff);
+        cia.write(&ticket_buff).expect("cia seek write failed");
         // padding
-        cia.write(&vec![0u8; 0x96C]);
+        cia.write(&vec![0u8; 0x96C]).expect("cia seek write failed");
         // chunk records in tmd
-        cia.write(&chunk_records);
+        cia.write(&chunk_records).expect("cia seek write failed");
         // padding
-        cia.write(&tmd_padding);
-
+        cia.write(&tmd_padding).expect("cia seek write failed");
         // write content count in tmd
-        cia.seek(SeekFrom::Start(0x2F9F));
-        cia.write(&[content_count]);
+        cia.seek(SeekFrom::Start(0x2F9F)).expect("cia seek failed");
+        cia.write(&[content_count]).expect("cia seek write failed");
         // write title ID in ticket and tmd
         let mut title_id_hex = title_id.to_bytes_le();
         if title_id_hex.len() < 8 {
@@ -482,28 +416,26 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             title_id_hex.append(&mut repeat(0u8).take(diff).collect::<Vec<u8>>());
         }
         title_id_hex.reverse();
-        cia.seek(SeekFrom::Start(0x2C1C));
-        cia.write(&title_id_hex);
-        cia.seek(SeekFrom::Start(0x2F4C));
-        cia.write(&title_id_hex);
-
+        cia.seek(SeekFrom::Start(0x2C1C)).expect("cia seek failed");
+        cia.write(&title_id_hex).expect("cia seek write failed");
+        cia.seek(SeekFrom::Start(0x2F4C)).expect("cia seek failed");
+        cia.write(&title_id_hex).expect("cia seek write failed");
         // write save size in tmd
-        cia.seek(SeekFrom::Start(0x2F5A));
-        cia.write(&save_size);
-
+        cia.seek(SeekFrom::Start(0x2F5A)).expect("cia seek failed");
+        cia.write(&save_size).expect("cia seek write failed");
         // Game Executable CXI NCCH Header + first-half ExHeader
-
         {
-            cia.seek(SeekFrom::End(0));
+            cia.seek(SeekFrom::End(0)).expect("cia seek failed");
             let mut game_cxi_hash = vec![0u8; 0x20];
             let mut sha = Sha256::new();
             sha.input(&ncch_header);
-            cia.write(&ncch_header);
+            cia.write(&ncch_header).expect("cia seek write failed");
             sha.input(&extheader);
-            cia.write(&extheader);
+            cia.write(&extheader).expect("cia seek write failed");
             {
                 println!("Writing Game Executable CXI...");
-                rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x200 + 0x400)); // skip the ncch_header and extheader
+                rom.seek(SeekFrom::Start(game_cxi_offset.to_u64().unwrap() + 0x200 + 0x400))
+                    .expect("failed to seek for CXI"); // skip the ncch_header and extheader
                 let mut left = game_cxi_size.to_isize().unwrap() - 0x200 - 0x400;
                 let bar = ProgressBar::new(left as u64);
                 let mut buff = vec![0u8; READ_SIZE];
@@ -511,8 +443,8 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                     if left < READ_SIZE as isize {
                         buff = vec![0u8; left as usize];
                     }
-                    rom.read_exact(&mut buff);
-                    cia.write(&buff);
+                    rom.read_exact(&mut buff).expect("failed to read CXI");
+                    cia.write(&buff).expect("cia seek write failed");
                     sha.input(&buff);
                     left -= READ_SIZE as isize;
                     bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
@@ -521,20 +453,21 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             }
             sha.result(&mut game_cxi_hash);
             println!("Game Executable CXI SHA-256 hash: {:016X}", BigUint::from_bytes_be(&game_cxi_hash));
-            cia.seek(SeekFrom::Start(0x38D4));
-            cia.write(&game_cxi_hash);
+            cia.seek(SeekFrom::Start(0x38D4)).expect("cia seek failed");
+            cia.write(&game_cxi_hash).expect("cia seek write failed");
             chunk_records.splice(0x10..0x30, game_cxi_hash.iter().cloned());
         }
         {
             let mut cr_offset = 0usize;
             //  Manual CFA
             if manual_cfa_offset.to_u64().unwrap() != 0 {
-                cia.seek(SeekFrom::End(0));
+                cia.seek(SeekFrom::End(0)).expect("cia seek failed");
                 let mut hash_buff = vec![0u8; 0x20];
                 let mut sha = Sha256::new();
                 {
                     println!("Writing Manual CFA...");
-                    rom.seek(SeekFrom::Start(manual_cfa_offset.to_u64().unwrap()));
+                    rom.seek(SeekFrom::Start(manual_cfa_offset.to_u64().unwrap()))
+                        .expect("failed to seek for Manual CFA");
                     let mut left = manual_cfa_size.to_isize().unwrap();
                     let bar = ProgressBar::new(left as u64);
                     let mut buff = vec![0u8; READ_SIZE];
@@ -542,8 +475,8 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                         if left < READ_SIZE as isize {
                             buff = vec![0u8; left as usize];
                         }
-                        rom.read_exact(&mut buff);
-                        cia.write(&buff);
+                        rom.read_exact(&mut buff).expect("failed to read Manual CFA");
+                        cia.write(&buff).expect("cia seek write failed");
                         sha.input(&buff);
                         left -= READ_SIZE as isize;
                         bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
@@ -552,19 +485,20 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 }
                 sha.result(&mut hash_buff);
                 println!("Manual CFA SHA-256 hash: {:016X}", BigUint::from_bytes_be(&hash_buff));
-                cia.seek(SeekFrom::Start(0x3904));
-                cia.write(&hash_buff);
+                cia.seek(SeekFrom::Start(0x3904)).expect("cia seek failed");
+                cia.write(&hash_buff).expect("cia seek write failed");
                 chunk_records.splice(0x40..0x60, hash_buff.iter().cloned());
                 cr_offset += 0x30;
             }
             // Download Play child container CFA
             if dlpchild_cfa_offset.to_u64().unwrap() != 0 {
-                cia.seek(SeekFrom::End(0));
+                cia.seek(SeekFrom::End(0)).expect("cia seek failed");
                 let mut hash_buff = vec![0u8; 0x20];
                 let mut sha = Sha256::new();
                 {
                     println!("Writing Download Play child container CFA...");
-                    rom.seek(SeekFrom::Start(dlpchild_cfa_offset.to_u64().unwrap()));
+                    rom.seek(SeekFrom::Start(dlpchild_cfa_offset.to_u64().unwrap()))
+                        .expect("failed to seek for Download Play");
                     let mut left = manual_cfa_size.to_isize().unwrap();
                     let bar = ProgressBar::new(left as u64);
                     let mut buff = vec![0u8; READ_SIZE];
@@ -572,8 +506,8 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                         if left < READ_SIZE as isize {
                             buff = vec![0u8; left as usize];
                         }
-                        rom.read_exact(&mut buff);
-                        cia.write(&buff);
+                        rom.read_exact(&mut buff).expect("failed to read Download Play");
+                        cia.write(&buff).expect("cia seek write failed");
                         sha.input(&buff);
                         left -= READ_SIZE as isize;
                         bar.inc((if left < 0 { (left + READ_SIZE as isize) as usize } else { READ_SIZE }) as u64);
@@ -582,8 +516,8 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 }
                 sha.result(&mut hash_buff);
                 println!("Download Play child container CFA SHA-256 hash: {:016X}", BigUint::from_bytes_be(&hash_buff));
-                cia.seek(SeekFrom::Start((0x3904 + cr_offset) as u64));
-                cia.write(&hash_buff);
+                cia.seek(SeekFrom::Start((0x3904 + cr_offset) as u64)).expect("cia seek failed");
+                cia.write(&hash_buff).expect("cia seek write failed");
                 chunk_records.splice((0x40 + cr_offset)..(0x60 + cr_offset), hash_buff.iter().cloned());
             }
         }
@@ -595,10 +529,10 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             sha.input(&chunk_records);
             sha.result(&mut chunk_records_hash);
             println!("Content chunk records SHA-256 hash: {:016X}", BigUint::from_bytes_be(&chunk_records_hash));
-            cia.seek(SeekFrom::Start(0x2FC7));
-            cia.write(&[content_count]);
-            cia.write(&chunk_records_hash);
-            cia.seek(SeekFrom::Start(0x2FA4));
+            cia.seek(SeekFrom::Start(0x2FC7)).expect("cia seek failed");
+            cia.write(&[content_count]).expect("cia seek write failed");
+            cia.write(&chunk_records_hash).expect("cia seek write failed");
+            cia.seek(SeekFrom::Start(0x2FA4)).expect("cia seek failed");
             let mut info_records_hash = vec![0u8; 0x20];
             let mut info_records_sha = Sha256::new();
             info_records_sha.input(&[0, 0, 0, content_count]);
@@ -606,18 +540,18 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             info_records_sha.input(&vec![0u8; 0x8DC]);
             info_records_sha.result(&mut info_records_hash);
             println!("Content info records SHA-256 hash: {:016X}", BigUint::from_bytes_be(&info_records_hash));
-            cia.write(&info_records_hash);
+            cia.write(&info_records_hash).expect("cia seek write failed");
         }
         // write Meta region
         {
-            cia.seek(SeekFrom::End(0));
-            cia.write(&dependency_list);
-            cia.write(&vec![0u8; 0x180]);
+            cia.seek(SeekFrom::End(0)).expect("cia seek failed");
+            cia.write(&dependency_list).expect("cia seek write failed");
+            cia.write(&vec![0u8; 0x180]).expect("cia seek write failed");
             let mut end_mark = vec![];
-            end_mark.write_u32::<LittleEndian>(0x2);
-            cia.write(&end_mark);
-            cia.write(&vec![0u8; 0xFC]);
-            cia.write(&exefs_icon);
+            end_mark.write_u32::<LittleEndian>(0x2).expect("failed to write end mark");
+            cia.write(&end_mark).expect("cia seek write failed");
+            cia.write(&vec![0u8; 0xFC]).expect("cia seek write failed");
+            cia.write(&exefs_icon).expect("cia seek write failed");
         }
     }
 }

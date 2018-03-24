@@ -1,8 +1,6 @@
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 use shellexpand;
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 pub fn is_valid_file(path: &str) -> bool {
