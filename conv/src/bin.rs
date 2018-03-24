@@ -1,16 +1,12 @@
 #[macro_use]
 extern crate clap;
-#[macro_use]
-extern crate log;
 extern crate conv_lib;
 extern crate shellexpand;
 extern crate core;
 
-mod conv;
-
 use clap::{App, AppSettings, Arg};
-use conv::conv;
 use std::path::Path;
+use conv_lib::conv::conv;
 
 fn main() {
     let app = App::new(crate_name!())

@@ -1,20 +1,15 @@
-extern crate byteorder;
-extern crate crypto;
-extern crate num_bigint;
-extern crate num_traits;
-extern crate indicatif;
+use byteorder::{BigEndian, LittleEndian, WriteBytesExt};
+use crypto::aes::{ctr, KeySize};
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
+use num_bigint::BigUint;
+use num_traits::{FromPrimitive, Num, ToPrimitive};
+use indicatif::ProgressBar;
 
-use self::byteorder::{BigEndian, LittleEndian, WriteBytesExt};
-use self::crypto::aes::{ctr, KeySize::KeySize128};
-use self::crypto::digest::Digest;
-use self::crypto::sha2::Sha256;
-use self::num_bigint::BigUint;
-use self::num_traits::{FromPrimitive, Num, ToPrimitive};
-use self::indicatif::ProgressBar;
+use get_bins::get_boot9;
+use get_bins::get_cert_chain_retail;
+use get_bins::get_ticket_tmd;
 
-use conv_lib::get_bins::get_boot9;
-use conv_lib::get_bins::get_cert_chain_retail;
-use conv_lib::get_bins::get_ticket_tmd;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write, BufReader, BufWriter};
 use std::iter::repeat;
@@ -62,11 +57,11 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
         let mut ticket_tmd = File::open(get_ticket_tmd().unwrap()).unwrap();
         let mut boot9 = File::open(get_boot9().unwrap()).unwrap();
 
-        if let Ok(size) = cert_chain_retail.read_to_end(&mut cert_buff) {
-            debug!("cert_chain_retail size: {}", size);
+        if cert_chain_retail.read_to_end(&mut cert_buff).is_err() {
+            return;
         }
-        if let Ok(size) = ticket_tmd.read_to_end(&mut ticket_buff) {
-            debug!("ticket_tmd size: {}", size);
+        if ticket_tmd.read_to_end(&mut ticket_buff).is_err() {
+            return;
         }
         {
             let mut keys_offset = 0;
@@ -96,7 +91,6 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
             println!("{} is not a CCI file (missing NCSD magic)", stem);
             return;
         }
-        debug!("NCSD check pass");
     }
     {
         if rom.seek(SeekFrom::Start(0x108)).is_err() {
@@ -245,7 +239,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 iv.append(&mut repeat(0u8).take(diff).collect::<Vec<u8>>());
             }
             iv.reverse();
-            let mut dec = ctr(KeySize128, &k, &iv);
+            let mut dec = ctr(KeySize::KeySize128, &k, &iv);
             dec.process(&buff, &mut dec_out_buff);
             let mut sha = Sha256::new();
             sha.input(&dec_out_buff);
@@ -303,7 +297,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 iv.append(&mut repeat(0u8).take(diff).collect::<Vec<u8>>());
             }
             iv.reverse();
-            let mut dec = ctr(KeySize128, &k, &iv);
+            let mut dec = ctr(KeySize::KeySize128, &k, &iv);
             dec.process(&extheader, &mut enc_out_buff);
             extheader = enc_out_buff.clone();
         }
@@ -350,7 +344,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                 iv.append(&mut repeat(0u8).take(diff).collect::<Vec<u8>>());
             }
             iv.reverse();
-            let mut dec = ctr(KeySize128, &k, &iv);
+            let mut dec = ctr(KeySize::KeySize128, &k, &iv);
             dec.process(&exefs_file_header, &mut dec_buff);
             exefs_file_header = dec_buff.clone();
         }
@@ -390,7 +384,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
                         iv.append(&mut repeat(0u8).take(diff).collect::<Vec<u8>>());
                     }
                     iv.reverse();
-                    let mut dec = ctr(KeySize128, &k, &iv);
+                    let mut dec = ctr(KeySize::KeySize128, &k, &iv);
                     dec.process(&exefs_icon, &mut dec_buff);
                     exefs_icon = dec_buff.clone();
                 }
