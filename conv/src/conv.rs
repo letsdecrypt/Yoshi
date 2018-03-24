@@ -274,6 +274,7 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, verbose: bool) {
     }
     // patch ExtHeader to make an SD title
     {
+        println!("Patching ExtHeader...");
         extheader[0xD] |= 2;
         let mut sha = Sha256::new();
         let mut new_extheader_hash = vec![0u8; 0x20];
