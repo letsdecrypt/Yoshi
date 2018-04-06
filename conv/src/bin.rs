@@ -40,7 +40,10 @@ fn main() {
     let m = app.get_matches();
     let is_files_present = m.is_present("files");
     if is_files_present {
-        let boot9_key = [0xB9u8, 0x8E, 0x95, 0xCE, 0xCA, 0x3E, 0x4D, 0x17, 0x1F, 0x76, 0xA9, 0x4D, 0xE9, 0x34, 0xC0, 0x53];
+        let boot9_key = [
+            0xB9u8, 0x8E, 0x95, 0xCE, 0xCA, 0x3E, 0x4D, 0x17, 0x1F, 0x76, 0xA9, 0x4D, 0xE9, 0x34,
+            0xC0, 0x53,
+        ];
         let cert_chain_retail = include_bytes!("../cert_chain_retail.bin");
         let ticket_tmd = include_bytes!("../ticket_tmd.bin");
 
@@ -61,11 +64,18 @@ fn main() {
                     if full_path.is_file() {
                         if let Some(stem) = full_path.file_stem() {
                             let start_time = Instant::now();
-                            conv(full_path, stem.to_str().unwrap(), &output_path,
-                                 &boot9_key, cert_chain_retail, ticket_tmd,
-                                 verbose);
+                            conv(
+                                full_path,
+                                stem.to_str().unwrap(),
+                                &output_path,
+                                &boot9_key,
+                                cert_chain_retail,
+                                ticket_tmd,
+                                verbose,
+                            );
                             let elapsed = start_time.elapsed();
-                            let elapsed = elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
+                            let elapsed = elapsed.as_secs() as f64
+                                + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
                             println!("{} is converted in {:.2}s", stem.to_str().unwrap(), elapsed);
                         }
                     } else {
