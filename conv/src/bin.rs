@@ -6,6 +6,7 @@ extern crate shellexpand;
 use clap::{App, AppSettings, Arg};
 use conv_lib::conv::conv;
 use std::path::Path;
+use std::time::Instant;
 
 fn main() {
     let app = App::new(crate_name!())
@@ -59,9 +60,13 @@ fn main() {
                     let full_path = Path::new(&real_path);
                     if full_path.is_file() {
                         if let Some(stem) = full_path.file_stem() {
+                            let start_time = Instant::now();
                             conv(full_path, stem.to_str().unwrap(), &output_path,
                                  &boot9_key, cert_chain_retail, ticket_tmd,
                                  verbose);
+                            let elapsed = start_time.elapsed();
+                            let elapsed = elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
+                            println!("{} is converted in {:.2}s", stem.to_str().unwrap(), elapsed);
                         }
                     } else {
                         println!("{} is not a valid file", file);
