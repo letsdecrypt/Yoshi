@@ -39,6 +39,10 @@ fn main() {
     let m = app.get_matches();
     let is_files_present = m.is_present("files");
     if is_files_present {
+        let boot9_key = [0xB9u8, 0x8E, 0x95, 0xCE, 0xCA, 0x3E, 0x4D, 0x17, 0x1F, 0x76, 0xA9, 0x4D, 0xE9, 0x34, 0xC0, 0x53];
+        let cert_chain_retail = include_bytes!("../cert_chain_retail.bin");
+        let ticket_tmd = include_bytes!("../ticket_tmd.bin");
+
         let verbose = m.is_present("verbose");
         let overwrite = m.is_present("overwrite");
         let output = m.value_of("output").unwrap_or("./");
@@ -55,7 +59,9 @@ fn main() {
                     let full_path = Path::new(&real_path);
                     if full_path.is_file() {
                         if let Some(stem) = full_path.file_stem() {
-                            conv(full_path, stem.to_str().unwrap(), &output_path, verbose);
+                            conv(full_path, stem.to_str().unwrap(), &output_path,
+                                 &boot9_key, cert_chain_retail, ticket_tmd,
+                                 verbose);
                         }
                     } else {
                         println!("{} is not a valid file", file);

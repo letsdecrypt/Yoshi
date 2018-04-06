@@ -5,10 +5,6 @@ use crypto::sha2::Sha256;
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num, ToPrimitive};
 
-use get_bins::get_boot9;
-use get_bins::get_cert_chain_retail;
-use get_bins::get_ticket_tmd;
-
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::iter::repeat;
@@ -23,7 +19,9 @@ fn rotate_left_in_128(val: BigUint, r_bits: usize) -> BigUint {
         | ((val.clone() & max.clone()) >> (max_bits - (r_bits % max_bits)))
 }
 
-pub fn conv(full_path: &Path, stem: &str, output_path: &str, _verbose: bool) {
+pub fn conv(full_path: &Path, stem: &str, output_path: &str,
+            boot9_key: &[u8], cert_chain: &[u8], ticket_tmd: &[u8],
+            _verbose: bool) {
     let rom_file = File::open(full_path).unwrap();
     let mut rom = BufReader::with_capacity(READ_SIZE * 0x10, rom_file);
 
@@ -48,34 +46,6 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, _verbose: bool) {
     let mut exefs_icon = vec![0u8; 0x36C0];
     let dependency_list: Vec<u8>;
 
-    let mut boot9_key = vec![0u8; 0x10];
-    let mut cert_buff = Vec::<u8>::new();
-    let mut ticket_buff = Vec::<u8>::new();
-    {
-        let mut cert_chain_retail = File::open(get_cert_chain_retail().unwrap()).unwrap();
-        let mut ticket_tmd = File::open(get_ticket_tmd().unwrap()).unwrap();
-        let mut boot9 = File::open(get_boot9().unwrap()).unwrap();
-
-        cert_chain_retail
-            .read_to_end(&mut cert_buff)
-            .expect("failed to read cert_chain_retail");
-        ticket_tmd
-            .read_to_end(&mut ticket_buff)
-            .expect("failed to read ticket_tmd");
-        {
-            let mut keys_offset = 0;
-            if boot9.metadata().unwrap().len() == 0x10000 {
-                keys_offset += 0x8000;
-            }
-            boot9
-                .seek(SeekFrom::Start(0x59D0 + keys_offset))
-                .expect("failed to seek in boot9");
-            // big endian
-            boot9
-                .read_exact(&mut boot9_key)
-                .expect("failed to read boot9");
-        }
-    }
     // check for NCSD magic
     {
         rom.seek(SeekFrom::Start(0x100))
@@ -477,9 +447,9 @@ pub fn conv(full_path: &Path, stem: &str, output_path: &str, _verbose: bool) {
         cia.write(&vec![0u8; 0x201F])
             .expect("cia seek write failed");
         // cert chain
-        cia.write(&cert_buff).expect("cia seek write failed");
+        cia.write(&cert_chain).expect("cia seek write failed");
         // ticket, tmd
-        cia.write(&ticket_buff).expect("cia seek write failed");
+        cia.write(&ticket_tmd).expect("cia seek write failed");
         // padding
         cia.write(&vec![0u8; 0x96C]).expect("cia seek write failed");
         // chunk records in tmd
