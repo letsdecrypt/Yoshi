@@ -1,9 +1,5 @@
-#[macro_use]
-extern crate clap;
-extern crate conv_lib;
-extern crate shellexpand;
-
 use clap::{App, AppSettings, Arg};
+use clap::{crate_name, crate_authors, crate_description, crate_version};
 use conv_lib::conv::conv;
 use std::path::Path;
 use std::time::Instant;
